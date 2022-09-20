@@ -1,29 +1,44 @@
+const e = require('express');
 const db = require('../index');
 
-// view all tasks
-module.exports.viewAll = (req,res) => {
-
-	let sql = 'SELECT * FROM task'
-
-	db.query(sql, (err,result) => {
-		if(err) throw err;
-		res.send(result)
-	}
-	)
-}
-
-// view tasks per user
+// view tasks by user
 module.exports.view = (req,res) => {
 	let id = req.user.user_id;
 
-	let sql = 'SELECT * FROM task WHERE user_id=?'
+	// get date now then check first if user has overdue deadlines
+	dateNow = JSON.stringify(new Date())
+	
+	let sql = `SELECT * FROM task WHERE user_id=${id} AND deadline < ${dateNow}`
 
-	db.query(sql, id, (err,result) => {
+	// query for all tasks
+	let new_sql = `SELECT * FROM task WHERE user_id=${id}`
+
+	db.query(sql, (err,result) => {
 		if(err) throw err;
-		res.send(result)
-	}
-	)
+		if(result.length !== 0){
+			result.forEach(element => {
+				if(element.status === "In Progress"){
+					sql2 = `UPDATE task SET status="Overdue" WHERE task_id = ${element.task_id}`
+					db.query(sql2, (err,result) => {
+						if(err) throw err
+				})}
+			})
+			//after updating values
+			db.query(new_sql, (err,result) => {
+				if(err) throw err;
+				res.send(result)
+			})
+		} else {
+			//if there are no overdues, return all tasks
+			db.query(new_sql, (err,result) => {
+				if(err) throw err;
+				res.send(result)
+			}
+			)
+		}
+	})
 }
+
 
 // create new task
 module.exports.create = (req,res) => {
@@ -61,10 +76,10 @@ module.exports.edit = (req,res) => {
 
 			db.query(sql, task, (err,result) => {
 				if(err) throw err;
-				res.send(result)
+				res.send(true)
 			})
 		} else {
-			res.send("Task Not Found!")
+			res.send(false)
 		}
 	})
 
@@ -81,15 +96,30 @@ module.exports.delete = (req,res) => {
 
 			db.query(sql, (err,result) => {
 				if(err) throw err;
-				res.send(result)
+				res.send(true)
 			})
 		} else {
-			res.send("Task Not Found!")
+			res.send(false)
 		}
 	})
 }
 
 //update status
 module.exports.setStatus = (req,res) => {
+	let sql = `SELECT * FROM task WHERE user_id=${req.user.user_id} AND task_id=${req.params.task_id}`
 
+	db.query(sql, (err, result) => {
+		if(err) throw err;
+		if(result.length !== 0){
+			sql = `UPDATE task SET status="Done" WHERE task_id=${req.params.task_id}`
+
+			db.query(sql, (err,result) => {
+				if(err) throw err;
+				res.send(result)
+			})
+		} else {
+			res.send(false)
+		}
+	})
+	
 }

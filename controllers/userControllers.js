@@ -2,6 +2,14 @@ const db = require('../index');
 const bcrypt = require("bcrypt");
 const auth = require("../auth");
 
+module.exports.getDetails = (req,res) => {
+    let sql = `SELECT user_id, full_name, email FROM user WHERE user_id=${req.user.user_id}`
+    db.query(sql, (err,result) => {
+        if(err) throw err;
+        res.send(result)
+    })
+}
+
 // register new user
 module.exports.register = (req,res) => {
     let email = req.body.email;
@@ -24,16 +32,21 @@ module.exports.register = (req,res) => {
 
             db.query(sql, user, (err,result) => {
                 if(err) throw err;
-                res.send(true)
-            })
+                // after registering, generate access token
+                id = result.insertId
+                new_sql = `SELECT * FROM user WHERE user_id=${id}`
+                db.query(new_sql, (err,result) => {
+                    if(err) throw err;
+                    res.send({accessToken: auth.createAccessToken(result[0])})
+            })})
         } else {
-            res.send("Email already exists!")
+            res.send(false)
         }
 	}
 	)
 }
 	
-// login new user
+// login user
 module.exports.login = (req,res) => {
     let email = req.body.email;
 
@@ -47,9 +60,9 @@ module.exports.login = (req,res) => {
 
             const isPasswordCorrect = bcrypt.compareSync(req.body.password,foundUser.password)
 
-            isPasswordCorrect ? res.send({accessToken: auth.createAccessToken(foundUser)}) : res.send("Incorrect Password")
+            isPasswordCorrect ? res.send({accessToken: auth.createAccessToken(foundUser)}) : res.send(false)
         } else {
-            res.send("User not found")
+            res.send(false)
         }
 	}
 	)
